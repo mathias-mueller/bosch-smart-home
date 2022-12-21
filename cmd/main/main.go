@@ -23,6 +23,9 @@ func main() {
 	zerolog.SetGlobalLevel(zerolog.TraceLevel)
 
 	config, err := conf.LoadConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error loading config")
+	}
 
 	httpClient := client.Init(config)
 
@@ -39,9 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("error getting poll id")
 	}
-
 	events := polling.Start(httpClient, pollID, deviceChan, config)
 
 	export.Start(events)
-
 }

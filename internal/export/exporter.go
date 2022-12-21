@@ -17,18 +17,15 @@ func Start(events <-chan *polling.Event) {
 		influxdb2.DefaultOptions(),
 	)
 	writeAPI := client.WriteAPI("home", "smarthome")
-	writeAPI.SetWriteFailedCallback(func(batch string, error influxHttp.Error, retryAttempts uint) bool {
-		log.Err(error.Err).
+	writeAPI.SetWriteFailedCallback(func(batch string, err influxHttp.Error, retryAttempts uint) bool {
+		log.Err(err.Err).
 			Str("batch", batch).
 			Uint("retryAttempts", retryAttempts).
-			Str("message", error.Message).
-			Int("status", error.StatusCode).
-			Uint("retryAfter", error.RetryAfter).
+			Str("message", err.Message).
+			Int("status", err.StatusCode).
+			Uint("retryAfter", err.RetryAfter).
 			Msg("Error writing data to influx")
-		if error.StatusCode == http.StatusUnauthorized {
-			return false
-		}
-		return true
+		return err.StatusCode != http.StatusUnauthorized
 	})
 	for event := range events {
 		log.Info().
@@ -36,9 +33,9 @@ func Start(events <-chan *polling.Event) {
 			Interface("state", event.State).
 			Str("device", event.Device.Name).
 			Str("room", event.Device.Room.Name).
-			Str("id", event.Id).
+			Str("id", event.ID).
 			Msg("Got Event")
-		p := influxdb2.NewPoint(event.Id,
+		p := influxdb2.NewPoint(event.ID,
 			map[string]string{
 				"device": event.Device.Name,
 				"room":   event.Device.Room.Name,
@@ -48,5 +45,4 @@ func Start(events <-chan *polling.Event) {
 		)
 		writeAPI.WritePoint(p)
 	}
-
 }

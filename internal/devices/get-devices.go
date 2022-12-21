@@ -4,8 +4,10 @@ import (
 	"bosch-data-exporter/internal/conf"
 	"bosch-data-exporter/internal/rooms"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -15,11 +17,11 @@ import (
 
 type DeviceResponse struct {
 	Type             string   `json:"@type"`
-	RootDeviceId     string   `json:"rootDeviceId"`
-	Id               string   `json:"id"`
+	RootDeviceID     string   `json:"rootDeviceId"`
+	ID               string   `json:"id"`
 	DeviceServiceIds []string `json:"deviceServiceIds"`
 	Manufacturer     string   `json:"manufacturer"`
-	RoomId           string   `json:"roomId"`
+	RoomID           string   `json:"roomId"`
 	DeviceModel      string   `json:"deviceModel"`
 	Serial           string   `json:"serial"`
 	Profile          string   `json:"profile"`
@@ -30,7 +32,7 @@ type DeviceResponse struct {
 
 type Device struct {
 	Type        string
-	Id          string
+	ID          string
 	DeviceModel string
 	Serial      string
 	Name        string
@@ -43,7 +45,7 @@ var lock = sync.Mutex{}
 
 var DefaultDevice = &Device{
 	Type:        "default",
-	Id:          "",
+	ID:          "",
 	DeviceModel: "none",
 	Serial:      "",
 	Name:        "default",
@@ -67,11 +69,8 @@ func GetDevices(client *http.Client, roomChan <-chan []*rooms.Room, config *conf
 	ticker := time.NewTicker(time.Minute * time.Duration(config.DeviceUpdateInterval))
 	go func() {
 		defer close(output)
-		for {
-			select {
-			case <-ticker.C:
-				go pipeSingle(client, output, nil)
-			}
+		for range ticker.C {
+			go pipeSingle(client, output, nil)
 		}
 	}()
 	return output
@@ -88,7 +87,8 @@ func pipeSingle(client *http.Client, output chan []*Device, config *conf.Config)
 
 func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 	log.Debug().Msg("Getting devices...")
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
 		http.MethodGet,
 		fmt.Sprintf("%s/smarthome/devices", config.BaseURL),
 		nil,
@@ -101,6 +101,12 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Err(err).Msg("Error closing response body")
+		}
+	}(resp.Body)
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
 		return nil, e
@@ -120,18 +126,18 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 
 	for i := range jsonBody {
 		log.Info().
-			Str("id", jsonBody[i].Id).
+			Str("id", jsonBody[i].ID).
 			Str("name", jsonBody[i].Name).
 			Str("type", jsonBody[i].Type).
 			Str("status", jsonBody[i].Status).
-			Str("roomId", jsonBody[i].RoomId).
+			Str("roomId", jsonBody[i].RoomID).
 			Str("serial", jsonBody[i].Serial).
 			Msg("Got device")
-		room := getRoom(jsonBody[i].RoomId)
+		room := getRoom(jsonBody[i].RoomID)
 		if room == nil {
 			log.Error().
-				Str("roomID", jsonBody[i].RoomId).
-				Str("deviceId", jsonBody[i].Id).
+				Str("roomID", jsonBody[i].RoomID).
+				Str("deviceId", jsonBody[i].ID).
 				Str("deviceName", jsonBody[i].Name).
 				Msg("Cannot find room")
 			continue
@@ -140,7 +146,7 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 			devices,
 			&Device{
 				Type:        jsonBody[i].Type,
-				Id:          jsonBody[i].Id,
+				ID:          jsonBody[i].ID,
 				DeviceModel: jsonBody[i].DeviceModel,
 				Serial:      jsonBody[i].Serial,
 				Name:        jsonBody[i].Name,
@@ -156,7 +162,7 @@ func getRoom(id string) *rooms.Room {
 	lock.Lock()
 	defer lock.Unlock()
 	for _, r := range currentRooms {
-		if r.Id == id {
+		if r.ID == id {
 			return r
 		}
 	}

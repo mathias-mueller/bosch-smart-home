@@ -4,8 +4,10 @@ import (
 	"bosch-data-exporter/internal/conf"
 	"bosch-data-exporter/internal/devices"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -33,13 +35,13 @@ type pollResponse struct {
 type pollResponseResult struct {
 	Path     string                 `json:"path"`
 	Type     string                 `json:"@type"`
-	Id       string                 `json:"id"`
+	ID       string                 `json:"id"`
 	State    map[string]interface{} `json:"state"`
-	DeviceId string                 `json:"deviceId"`
+	DeviceID string                 `json:"deviceId"`
 }
 
 type Event struct {
-	Id     string
+	ID     string
 	Type   string
 	Device *devices.Device
 	State  map[string]interface{}
@@ -52,7 +54,7 @@ type pollResponseError struct {
 
 func Subscribe(client *http.Client, config *conf.Config) (<-chan string, error) {
 	output := make(chan string, 1)
-	pollID, err := getSinglePollId(client, config)
+	pollID, err := getSinglePollID(client, config)
 	if err != nil {
 		return nil, err
 	}
@@ -60,21 +62,18 @@ func Subscribe(client *http.Client, config *conf.Config) (<-chan string, error) 
 	ticker := time.NewTicker(time.Minute * 30)
 	go func() {
 		defer close(output)
-		for {
-			select {
-			case <-ticker.C:
-				pollID2, e := getSinglePollId(client, config)
-				if err != nil {
-					log.Err(e).Msg("Error getting polling id")
-				}
-				output <- pollID2
+		for range ticker.C {
+			pollID2, e := getSinglePollID(client, config)
+			if err != nil {
+				log.Err(e).Msg("Error getting polling id")
 			}
+			output <- pollID2
 		}
 	}()
 	return output, nil
 }
 
-func getSinglePollId(client *http.Client, config *conf.Config) (string, error) {
+func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
 	requestBody := []pollRequest{
 		{
 			Jsonrpc: "2.0",
@@ -105,6 +104,12 @@ func getSinglePollId(client *http.Client, config *conf.Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Err(err).Msg("Error closing response body")
+		}
+	}(resp.Body)
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
 		return "", e
@@ -132,7 +137,12 @@ var currentDevices []*devices.Device
 var pollID string
 var lock = sync.Mutex{}
 
-func Start(client *http.Client, pollIDchan <-chan string, deviceChan <-chan []*devices.Device, config *conf.Config) <-chan *Event {
+func Start(
+	client *http.Client,
+	pollIDchan <-chan string,
+	deviceChan <-chan []*devices.Device,
+	config *conf.Config,
+) <-chan *Event {
 	lock.Lock()
 	currentDevices = <-deviceChan
 	pollID = <-pollIDchan
@@ -187,7 +197,8 @@ func Get(client *http.Client, pollID string, config *conf.Config) ([]*Event, err
 		return nil, err
 	}
 	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", config.BaseURL)
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
 		http.MethodPost,
 		shcPollURL,
 		bytes.NewReader(requestBodyBytes),
@@ -200,6 +211,12 @@ func Get(client *http.Client, pollID string, config *conf.Config) ([]*Event, err
 	if err != nil {
 		return nil, err
 	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Err(err).Msg("Error closing response body")
+		}
+	}(resp.Body)
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
 		return nil, e
@@ -230,20 +247,20 @@ func Get(client *http.Client, pollID string, config *conf.Config) ([]*Event, err
 	for i := range shcBody.Result {
 		event := &shcBody.Result[i]
 		log.Info().
-			Str("deviceID", event.DeviceId).
-			Str("id", event.Id).
+			Str("deviceID", event.DeviceID).
+			Str("id", event.ID).
 			Str("path", event.Path).
 			Str("type", event.Type).
 			Interface("state", event.State).
 			Msg("poll result")
-		device := getDevice(event.DeviceId)
+		device := getDevice(event.DeviceID)
 		if device == nil {
 			device = devices.DefaultDevice
 		}
 		events = append(
 			events,
 			&Event{
-				Id:     event.Id,
+				ID:     event.ID,
 				Type:   event.Type,
 				Device: device,
 				State:  event.State,
@@ -258,7 +275,7 @@ func getDevice(id string) *devices.Device {
 	lock.Lock()
 	defer lock.Unlock()
 	for _, d := range currentDevices {
-		if d.Id == id {
+		if d.ID == id {
 			return d
 		}
 	}

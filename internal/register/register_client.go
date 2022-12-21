@@ -3,8 +3,10 @@ package register
 import (
 	"bosch-data-exporter/internal/conf"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -15,7 +17,7 @@ const clientCertFile = "client-cert.pem"
 
 type registerRequest struct {
 	Type        string `json:"@type"`
-	Id          string `json:"id"`
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	PrimaryRole string `json:"primaryRole"`
 	Certificate string `json:"certificate"`
@@ -23,14 +25,18 @@ type registerRequest struct {
 
 func Register(client *http.Client, config *conf.Config) error {
 	clients, err := getRegisteredClients(client, config)
+	if err != nil {
+		log.Err(err).Msg("Error getting registered clients")
+		return err
+	}
 	for _, boschClient := range clients {
 		log.Debug().
-			Str("id", boschClient.Id).
+			Str("id", boschClient.ID).
 			Str("name", boschClient.Name).
 			Msg("Checking registered client")
-		if boschClient.Id == config.BoschConfig.ClientID {
+		if boschClient.ID == config.BoschConfig.ClientID {
 			log.Info().
-				Str("client_id", boschClient.Id).
+				Str("client_id", boschClient.ID).
 				Msg("Client already registered. Skipping creation")
 			return nil
 		}
@@ -44,7 +50,7 @@ func Register(client *http.Client, config *conf.Config) error {
 
 	requestData := registerRequest{
 		Type:        "client",
-		Id:          config.BoschConfig.ClientID,
+		ID:          config.BoschConfig.ClientID,
 		Name:        config.BoschConfig.ClientName,
 		PrimaryRole: "ROLE_RESTRICTED_CLIENT",
 		Certificate: string(cert),
@@ -59,7 +65,8 @@ func Register(client *http.Client, config *conf.Config) error {
 		Bytes("body", data).
 		Str("url", shcURL).
 		Msg("Registering client")
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
 		http.MethodPost,
 		shcURL,
 		bytes.NewReader(data),
@@ -73,6 +80,12 @@ func Register(client *http.Client, config *conf.Config) error {
 	if err != nil {
 		return err
 	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Err(err).Msg("Error closing response body")
+		}
+	}(resp.Body)
 
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
@@ -93,7 +106,7 @@ func Register(client *http.Client, config *conf.Config) error {
 
 type BoschClientResponse struct {
 	Type         string        `json:"@type"`
-	Id           string        `json:"id"`
+	ID           string        `json:"id"`
 	Name         string        `json:"name"`
 	PrimaryRole  string        `json:"primaryRole"`
 	Roles        []string      `json:"roles"`
@@ -109,6 +122,12 @@ func getRegisteredClients(client *http.Client, config *conf.Config) ([]*BoschCli
 	if err != nil {
 		return nil, err
 	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Err(err).Msg("Error closing response body")
+		}
+	}(response.Body)
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(response.Body); e != nil {
 		return nil, e
