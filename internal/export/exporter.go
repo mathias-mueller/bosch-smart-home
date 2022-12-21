@@ -2,11 +2,12 @@ package export
 
 import (
 	"bosch-data-exporter/internal/polling"
-	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
-	"github.com/influxdata/influxdb-client-go/v2/api/http"
-	"github.com/rs/zerolog/log"
-	gohttp "net/http"
+	"net/http"
 	"time"
+
+	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
+	influxHttp "github.com/influxdata/influxdb-client-go/v2/api/http"
+	"github.com/rs/zerolog/log"
 )
 
 func Start(events <-chan *polling.Event) {
@@ -16,7 +17,7 @@ func Start(events <-chan *polling.Event) {
 		influxdb2.DefaultOptions(),
 	)
 	writeAPI := client.WriteAPI("home", "smarthome")
-	writeAPI.SetWriteFailedCallback(func(batch string, error http.Error, retryAttempts uint) bool {
+	writeAPI.SetWriteFailedCallback(func(batch string, error influxHttp.Error, retryAttempts uint) bool {
 		log.Err(error.Err).
 			Str("batch", batch).
 			Uint("retryAttempts", retryAttempts).
@@ -24,7 +25,7 @@ func Start(events <-chan *polling.Event) {
 			Int("status", error.StatusCode).
 			Uint("retryAfter", error.RetryAfter).
 			Msg("Error writing data to influx")
-		if error.StatusCode == gohttp.StatusUnauthorized {
+		if error.StatusCode == http.StatusUnauthorized {
 			return false
 		}
 		return true

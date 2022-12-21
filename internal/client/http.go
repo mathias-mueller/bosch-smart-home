@@ -8,9 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const clientCertFile = "client-cert.pem"
-const clientKeyFile = "client-key.pem"
-
 func Init(config *conf.Config) *http.Client {
 
 	cert, err := tls.LoadX509KeyPair(config.ClientCertPath, config.ClientKeyPath)
@@ -36,8 +33,8 @@ func Init(config *conf.Config) *http.Client {
 		},
 	}
 	log.Trace().
-		Str("clientKeyFile", clientCertFile).
-		Str("clientCertFile", clientCertFile).
+		Str("clientKeyFile", config.ClientKeyPath).
+		Str("clientCertFile", config.ClientCertPath).
 		Msg("Created http client with certificates")
 	return &http.Client{
 		Transport: t,
