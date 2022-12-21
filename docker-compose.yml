@@ -1,0 +1,33 @@
+version: "3"
+
+services:
+  influx:
+    image: influxdb:alpine
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: adminPassword
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: adminToken
+      DOCKER_INFLUXDB_INIT_ORG: home
+      DOCKER_INFLUXDB_INIT_BUCKET: smarthome
+      DOCKER_INFLUXDB_INIT_RETENTION: 4w
+    ports:
+      - "8086:8086"
+    volumes:
+      - ./volumes/influx/data:/var/lib/influxdb2
+      - ./volumes/influx/config:/etc/influxdb2
+    networks:
+      - internal
+  grafana:
+    image: grafana/grafana:latest
+    volumes:
+      - ./volumes/grafana/data:/var/lib/grafana
+      - ./volumes/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    networks:
+      - internal
+networks:
+  internal:
+
+
