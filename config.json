@@ -1,0 +1,16 @@
+{
+  "DeviceUpdateInterval": 10,
+  "ClientCertPath": "client-cert.pem",
+  "ClientKeyPath": "client-key.pem",
+  "InfluxConfig": {
+    "ServerURL": "http://localhost:8086",
+    "AuthToken": "adminToken",
+    "Org": "home",
+    "Bucket": "smarthome"
+  },
+  "BoschConfig": {
+    "ClientID": "oss_go_exporter",
+    "ClientName": "OSS Go Data Exporter",
+    "BaseURL": "https://shc1084ad:8444"
+  }
+}

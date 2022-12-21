@@ -79,12 +79,12 @@ func Register(client *http.Client, config *conf.Config) error {
 	if err != nil {
 		return err
 	}
-	defer func(resp *http.Response) {
+	defer func() {
 		e := resp.Body.Close()
 		if e != nil {
 			log.Err(e).Msg("Error closing response body")
 		}
-	}(resp)
+	}()
 
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
@@ -117,16 +117,26 @@ type BoschClientResponse struct {
 }
 
 func getRegisteredClients(client *http.Client, config *conf.Config) ([]*BoschClientResponse, error) {
-	resp, err := client.Get(fmt.Sprintf("%s/smarthome/clients", config.BoschConfig.BaseURL))
+	req, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		fmt.Sprintf("%s/smarthome/clients", config.BoschConfig.BaseURL),
+		nil,
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer func(resp *http.Response) {
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
 		e := resp.Body.Close()
 		if e != nil {
 			log.Err(e).Msg("Error closing resp body")
 		}
-	}(resp)
+	}()
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
 		return nil, e

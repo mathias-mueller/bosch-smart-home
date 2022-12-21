@@ -1,5 +1,10 @@
 package conf
 
+import (
+	"encoding/json"
+	"os"
+)
+
 type Config struct {
 	DeviceUpdateInterval int
 	PollIDUpdateInterval int
@@ -23,20 +28,14 @@ type InfluxConfig struct {
 }
 
 func LoadConfig() (*Config, error) {
-	return &Config{
-		DeviceUpdateInterval: 10,
-		ClientCertPath:       "client-cert.pem",
-		ClientKeyPath:        "client-key.pem",
-		InfluxConfig: &InfluxConfig{
-			ServerURL: "http://localhost:8086",
-			AuthToken: "adminToken",
-			Org:       "home",
-			Bucket:    "smarthome",
-		},
-		BoschConfig: &BoschConfig{
-			ClientID:   "oss_go_exporter",
-			ClientName: "OSS Go Data Exporter",
-			BaseURL:    "https://shc1084ad:8444",
-		},
-	}, nil
+	content, err := os.ReadFile("config.json")
+	if err != nil {
+		return nil, err
+	}
+	var result *Config
+	err = json.Unmarshal(content, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

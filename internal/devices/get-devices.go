@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -101,12 +100,12 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		e := Body.Close()
+	defer func() {
+		e := resp.Body.Close()
 		if e != nil {
 			log.Err(e).Msg("Error closing response body")
 		}
-	}(resp.Body)
+	}()
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
 		return nil, e
