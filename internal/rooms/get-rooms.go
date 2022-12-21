@@ -58,7 +58,7 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Room, error) {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
-		fmt.Sprintf("%s/smarthome/rooms", config.BaseURL),
+		fmt.Sprintf("%s/smarthome/rooms", config.BoschConfig.BaseURL),
 		nil,
 	)
 	if err != nil {

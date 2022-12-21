@@ -2,7 +2,7 @@ package conf
 
 type Config struct {
 	DeviceUpdateInterval int
-	BaseURL              string
+	PollIDUpdateInterval int
 	ClientCertPath       string
 	ClientKeyPath        string
 	InfluxConfig         *InfluxConfig
@@ -12,6 +12,7 @@ type Config struct {
 type BoschConfig struct {
 	ClientID   string
 	ClientName string
+	BaseURL    string
 }
 
 type InfluxConfig struct {
@@ -24,7 +25,6 @@ type InfluxConfig struct {
 func LoadConfig() (*Config, error) {
 	return &Config{
 		DeviceUpdateInterval: 10,
-		BaseURL:              "https://shc1084ad:8444",
 		ClientCertPath:       "client-cert.pem",
 		ClientKeyPath:        "client-key.pem",
 		InfluxConfig: &InfluxConfig{
@@ -36,6 +36,7 @@ func LoadConfig() (*Config, error) {
 		BoschConfig: &BoschConfig{
 			ClientID:   "oss_go_exporter",
 			ClientName: "OSS Go Data Exporter",
+			BaseURL:    "https://shc1084ad:8444",
 		},
 	}, nil
 }

@@ -59,7 +59,7 @@ func Register(client *http.Client, config *conf.Config) error {
 	if err != nil {
 		return err
 	}
-	shcURL := fmt.Sprintf("%s/smarthome/clients", config.BaseURL)
+	shcURL := fmt.Sprintf("%s/smarthome/clients", config.BoschConfig.BaseURL)
 	log.Trace().
 		Bytes("body", data).
 		Str("url", shcURL).
@@ -117,7 +117,7 @@ type BoschClientResponse struct {
 }
 
 func getRegisteredClients(client *http.Client, config *conf.Config) ([]*BoschClientResponse, error) {
-	resp, err := client.Get(fmt.Sprintf("%s/smarthome/clients", config.BaseURL))
+	resp, err := client.Get(fmt.Sprintf("%s/smarthome/clients", config.BoschConfig.BaseURL))
 	if err != nil {
 		return nil, err
 	}

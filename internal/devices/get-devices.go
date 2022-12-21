@@ -90,7 +90,7 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
-		fmt.Sprintf("%s/smarthome/devices", config.BaseURL),
+		fmt.Sprintf("%s/smarthome/devices", config.BoschConfig.BaseURL),
 		nil,
 	)
 	if err != nil {

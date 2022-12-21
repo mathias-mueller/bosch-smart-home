@@ -59,7 +59,7 @@ func Subscribe(client *http.Client, config *conf.Config) (<-chan string, error) 
 		return nil, err
 	}
 	output <- pollID
-	ticker := time.NewTicker(time.Minute * 30)
+	ticker := time.NewTicker(time.Minute * time.Duration(config.PollIDUpdateInterval))
 	go func() {
 		defer close(output)
 		for range ticker.C {
@@ -85,7 +85,7 @@ func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", config.BaseURL)
+	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", config.BoschConfig.BaseURL)
 	log.Info().
 		Str("url", shcPollURL).
 		Bytes("body", requestBodyBytes).
@@ -197,7 +197,7 @@ func Get(client *http.Client, pollID string, config *conf.Config) ([]*Event, err
 	if err != nil {
 		return nil, err
 	}
-	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", config.BaseURL)
+	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", config.BoschConfig.BaseURL)
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
