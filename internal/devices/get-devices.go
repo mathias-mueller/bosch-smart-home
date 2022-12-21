@@ -102,9 +102,9 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 		return nil, err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Err(err).Msg("Error closing response body")
+		e := Body.Close()
+		if e != nil {
+			log.Err(e).Msg("Error closing response body")
 		}
 	}(resp.Body)
 	buf := &bytes.Buffer{}

@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 
@@ -80,12 +79,12 @@ func Register(client *http.Client, config *conf.Config) error {
 	if err != nil {
 		return err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Err(err).Msg("Error closing response body")
+	defer func(resp *http.Response) {
+		e := resp.Body.Close()
+		if e != nil {
+			log.Err(e).Msg("Error closing response body")
 		}
-	}(resp.Body)
+	}(resp)
 
 	buf := &bytes.Buffer{}
 	if _, e := buf.ReadFrom(resp.Body); e != nil {
@@ -118,18 +117,18 @@ type BoschClientResponse struct {
 }
 
 func getRegisteredClients(client *http.Client, config *conf.Config) ([]*BoschClientResponse, error) {
-	response, err := client.Get(fmt.Sprintf("%s/smarthome/clients", config.BaseURL))
+	resp, err := client.Get(fmt.Sprintf("%s/smarthome/clients", config.BaseURL))
 	if err != nil {
 		return nil, err
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Err(err).Msg("Error closing response body")
+	defer func(resp *http.Response) {
+		e := resp.Body.Close()
+		if e != nil {
+			log.Err(e).Msg("Error closing resp body")
 		}
-	}(response.Body)
+	}(resp)
 	buf := &bytes.Buffer{}
-	if _, e := buf.ReadFrom(response.Body); e != nil {
+	if _, e := buf.ReadFrom(resp.Body); e != nil {
 		return nil, e
 	}
 	body := buf.Bytes()

@@ -91,7 +91,8 @@ func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
 		Bytes("body", requestBodyBytes).
 		Msg("Creating poll subscription")
 
-	req, err := http.NewRequest(
+	req, err := http.NewRequestWithContext(
+		context.Background(),
 		http.MethodPost,
 		shcPollURL,
 		bytes.NewReader(requestBodyBytes),
@@ -105,9 +106,9 @@ func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
 		return "", err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Err(err).Msg("Error closing response body")
+		e := Body.Close()
+		if e != nil {
+			log.Err(e).Msg("Error closing response body")
 		}
 	}(resp.Body)
 	buf := &bytes.Buffer{}
@@ -212,9 +213,9 @@ func Get(client *http.Client, pollID string, config *conf.Config) ([]*Event, err
 		return nil, err
 	}
 	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Err(err).Msg("Error closing response body")
+		e := Body.Close()
+		if e != nil {
+			log.Err(e).Msg("Error closing response body")
 		}
 	}(resp.Body)
 	buf := &bytes.Buffer{}
