@@ -38,6 +38,20 @@
         owner: root
         group: root
         mode: '0755'
+    - name: Copy Client Cert
+      ansible.builtin.copy:
+        src: resources/client-cert.pem
+        dest: /usr/local/bosch-smarthome-exporter/client-cert.pem
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Copy Client Key
+      ansible.builtin.copy:
+        src: resources/client-key.pem
+        dest: /usr/local/bosch-smarthome-exporter/client-key.pem
+        owner: root
+        group: root
+        mode: '0755'
 - name: Start
   hosts: all
   become: true
