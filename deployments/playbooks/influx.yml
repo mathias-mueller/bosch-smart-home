@@ -17,7 +17,7 @@
         dest: /etc/influxdb/influxdb.conf
         regexp: 'hostname = "localhost"'
         replace: 'hostname = "{{ ansible_hostname }}"'
-        backup: yes
+        backup: true
     - name: Start the InfluxDB service
       ansible.builtin.service:
         name: influxdb
@@ -32,5 +32,5 @@
         user_password: password
     - name: Create database
       community.general.influxdb_database:
-        hostname: "{{localhost}}"
+        hostname: "localhost"
         database_name: "smarthome"
