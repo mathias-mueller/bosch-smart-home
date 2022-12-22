@@ -1,0 +1,12 @@
+[Unit]
+Description=Prometheus Node Exporter
+
+[Service]
+User=prometheus-node-exporter
+Restart=on-failure
+
+ExecStart=/usr/local/prometheus-node-exporter/node_exporter \
+  --collector.textfile.directory /usr/local/prometheus-node-exporter/textfile_collector
+
+[Install]
+WantedBy=multi-user.target

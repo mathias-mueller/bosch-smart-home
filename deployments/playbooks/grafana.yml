@@ -1,0 +1,26 @@
+- name: Install Grafana
+  hosts: all
+  become: true
+  tasks:
+    - name: Add Key
+      ansible.builtin.apt_key:
+        url: https://packages.grafana.com/gpg.key
+        state: present
+    - name: Add Repo
+      ansible.builtin.apt_repository:
+        repo: deb https://packages.grafana.com/oss/deb stable main
+        state: present
+        update_cache: true
+    - name: Install
+      ansible.builtin.apt:
+        name: grafana
+        state: latest
+- name: Start Grafana
+  hosts: all
+  become: true
+  tasks:
+    - name: Start & Enable Service
+      ansible.builtin.service:
+        name: grafana-server
+        state: started
+        enabled: true

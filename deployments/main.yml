@@ -1,0 +1,15 @@
+- name: Include Prometheus
+  ansible.builtin.import_playbook: playbooks/prometheus.yml
+
+- name: Include Node Exporter
+  ansible.builtin.import_playbook: playbooks/prometheus-node-exporter.yml
+
+- name: Include Influx
+  ansible.builtin.import_playbook: playbooks/influx.yml
+
+- name: Include Grafana
+  ansible.builtin.import_playbook: playbooks/grafana.yml
+
+
+- name: Include Pager Service
+  ansible.builtin.import_playbook: playbooks/bosch-smarthome-exporter-service.yml

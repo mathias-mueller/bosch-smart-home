@@ -1,0 +1,56 @@
+- name: Download Prometheus
+  hosts: all
+  become: true
+  tasks:
+    - name: Create tmp dir
+      ansible.builtin.file:
+        path: /tmp/prometheus
+        state: directory
+        mode: '0755'
+    - name: Create Prometheus dir
+      ansible.builtin.file:
+        path: /usr/local/prometheus
+        state: directory
+        mode: '0755'
+    - name: Download Tar
+      ansible.builtin.unarchive:
+        src: https://github.com/prometheus/prometheus/releases/download/v2.40.2/prometheus-2.40.2.linux-armv7.tar.gz
+        dest: /tmp/prometheus
+        remote_src: true
+    - name: Copy files
+      ansible.builtin.copy:
+        remote_src: true
+        src: /tmp/prometheus/prometheus-2.40.2.linux-armv7/
+        dest: /usr/local/prometheus
+        mode: '0777'
+    - name: Remove temp
+      ansible.builtin.file:
+        path: /tmp/prometheus
+        state: absent
+- name: Setup Service
+  hosts: all
+  become: true
+  tasks:
+    - name: Create Prometheus User
+      ansible.builtin.user:
+        name: prometheus
+        groups: pi
+        shell: /sbin/nologin
+        append: true
+        state: present
+        create_home: false
+    - name: Copy Prometheus Service file
+      ansible.builtin.copy:
+        src: resources/prometheus.service
+        dest: /etc/systemd/system
+        mode: '0777'
+    - name: Copy Prometheus Configuration
+      ansible.builtin.copy:
+        src: resources/prometheus-config.yml
+        dest: /usr/local/prometheus/prometheus.yml
+        mode: '0755'
+    - name: Start Prometheus Service
+      ansible.builtin.service:
+        name: prometheus
+        state: restarted
+        enabled: true

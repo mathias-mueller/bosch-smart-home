@@ -1,0 +1,49 @@
+- name: Setup User
+  hosts: all
+  become: true
+  tasks:
+    - name: Create User
+      ansible.builtin.user:
+        name: bosch_smarthome
+        groups: gpio
+        shell: /sbin/nologin
+        append: true
+        state: present
+        create_home: false
+- name: Setup files
+  hosts: all
+  become: true
+  tasks:
+    - name: Copy systemd service file to server
+      ansible.builtin.copy:
+        src: resources/bosch-smarthome-exporter.service
+        dest: /etc/systemd/system
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Create Directory
+      ansible.builtin.file:
+        path: /usr/local/pager-forwarding
+        state: directory
+        mode: '0755'
+    - name: Download Compiled Service
+      ansible.builtin.get_url:
+        url: https://github.com/mathias-mueller/bosch-smart-home/releases/download/latest/bosch-smart-home_arm
+        dest: /usr/local/bosch-smarthome-exporter/main
+        mode: '0777'
+    - name: Copy Config
+      ansible.builtin.copy:
+        src: resources/config.json
+        dest: /usr/local/bosch-smarthome-exporter/config.json
+        owner: root
+        group: root
+        mode: '0755'
+- name: Start
+  hosts: all
+  become: true
+  tasks:
+    - name: Start Service
+      ansible.builtin.service:
+        name: bosch-smarthome-exporter
+        state: restarted
+        enabled: true
