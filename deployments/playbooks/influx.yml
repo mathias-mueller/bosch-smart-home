@@ -14,10 +14,10 @@
   tasks:
     - name: Modify InfluxDB hostname
       ansible.builtin.replace:
-        dest=/etc/influxdb/influxdb.conf
-        regexp='hostname = "localhost"'
-        replace='hostname = "{{ ansible_hostname }}"'
-        backup=yes
+        dest: /etc/influxdb/influxdb.conf
+        regexp: 'hostname = "localhost"'
+        replace: 'hostname = "{{ ansible_hostname }}"'
+        backup: yes
     - name: Start the InfluxDB service
       ansible.builtin.service:
         name: influxdb
