@@ -3,6 +3,8 @@ package conf
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Config struct {
@@ -32,10 +34,11 @@ func LoadConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	var result *Config
-	err = json.Unmarshal(content, result)
+	log.Debug().Bytes("content", content).Msg("Loading config")
+	var result Config
+	err = json.Unmarshal(content, &result)
 	if err != nil {
 		return nil, err
 	}
-	return result, nil
+	return &result, nil
 }

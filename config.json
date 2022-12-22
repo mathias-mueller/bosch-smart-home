@@ -1,5 +1,6 @@
 {
   "DeviceUpdateInterval": 10,
+  "PollIDUpdateInterval": 30,
   "ClientCertPath": "client-cert.pem",
   "ClientKeyPath": "client-key.pem",
   "InfluxConfig": {
