@@ -30,5 +30,5 @@
     - name: Start & Enable Service
       ansible.builtin.service:
         name: grafana-server
-        state: started
+        state: restarted
         enabled: true

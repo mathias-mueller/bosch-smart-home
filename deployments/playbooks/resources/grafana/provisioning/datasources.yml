@@ -12,7 +12,7 @@ datasources:
     secureJsonData:
       password: password
   - name: prometheus
-    type: Prometheus
+    type: prometheus
     access: direct
     orgId: 1
     url: http://localhost:9090
