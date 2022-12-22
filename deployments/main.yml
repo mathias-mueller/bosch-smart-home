@@ -10,6 +10,5 @@
 - name: Include Grafana
   ansible.builtin.import_playbook: playbooks/grafana.yml
 
-
-- name: Include Pager Service
+- name: Include Smarthome Service
   ansible.builtin.import_playbook: playbooks/bosch-smarthome-exporter-service.yml
