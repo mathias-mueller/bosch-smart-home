@@ -23,7 +23,7 @@
         mode: '0755'
     - name: Create Directory
       ansible.builtin.file:
-        path: /usr/local/pager-forwarding
+        path: /usr/local/bosch-smarthome-exporter
         state: directory
         mode: '0755'
     - name: Download Compiled Service
