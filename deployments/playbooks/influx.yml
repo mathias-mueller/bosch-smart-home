@@ -8,7 +8,7 @@
       apt_repository: repo='deb https://repos.influxdata.com/ubuntu trusty stable' state=present
     - name: Install InfluxDB packages
       apt: name=influxdb state=present
-- name: Start Grafana
+- name: Start InfluxDB
   hosts: all
   become: true
   tasks:
@@ -19,8 +19,10 @@
         replace='hostname = "{{ ansible_hostname }}"'
         backup=yes
     - name: Start the InfluxDB service
-      service: name=influxdb state=restarted
-
+      service:
+        name: influxdb
+        state: restarted
+        enabled: true
 
 - name: Setup Influx
   tasks:
