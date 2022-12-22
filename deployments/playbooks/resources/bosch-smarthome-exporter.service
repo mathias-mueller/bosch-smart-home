@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 User=bosch_smarthome
-Group=gpio
+Group=users
 ExecStart=/usr/local/bosch-smarthome-exporter/main
 WorkingDirectory=/usr/local/bosch-smarthome-exporter
 Restart=always

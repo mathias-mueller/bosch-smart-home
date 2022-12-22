@@ -5,7 +5,7 @@
     - name: Create User
       ansible.builtin.user:
         name: bosch_smarthome
-        groups: gpio
+        groups: users
         shell: /sbin/nologin
         append: true
         state: present
