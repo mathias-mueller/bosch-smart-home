@@ -14,16 +14,11 @@
         regexp: 'hostname = "localhost"'
         replace: 'hostname = "{{ ansible_hostname }}"'
         backup: true
-- name: Start InfluxDB
-  hosts: all
-  become: true
-  tasks:
     - name: Start the InfluxDB service
       ansible.builtin.service:
         name: influxdb
         state: restarted
         enabled: true
-
 - name: Setup Influx
   tasks:
     - name: Create User
