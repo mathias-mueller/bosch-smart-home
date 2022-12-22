@@ -11,9 +11,10 @@ datasources:
       httpMode: GET
     secureJsonData:
       password: password
-  - name: prometheus
+    editable: false
+  - name: Prometheus
     type: prometheus
-    access: direct
+    access: proxy
     orgId: 1
     url: http://localhost:9090
     editable: false
