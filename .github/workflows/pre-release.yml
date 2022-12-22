@@ -24,7 +24,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: bosch-smart-home_${{matrix.os}}
-          path: bosch-smart-home_{{matrix.os}}
+          path: bosch-smart-home_${{matrix.os}}
   pre-release:
     needs: build
     name: "Pre Release"
