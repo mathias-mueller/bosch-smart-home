@@ -15,6 +15,14 @@
       ansible.builtin.apt:
         name: grafana
         state: latest
+    - name: Copy DataSources Provisioning
+      ansible.builtin.copy:
+        src: resources/grafana/provisioning/datasources.yml
+        dest: /etc/grafana/provisioning/datasources/datasources.yml
+        owner: root
+        group: root
+        mode: '0755'
+
 - name: Start Grafana
   hosts: all
   become: true
