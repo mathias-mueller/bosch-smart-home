@@ -7,20 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/rs/zerolog/log"
 )
-
-const clientCertFile = "client-cert.pem"
-
-type registerRequest struct {
-	Type        string `json:"@type"`
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	PrimaryRole string `json:"primaryRole"`
-	Certificate string `json:"certificate"`
-}
 
 func Register(client *http.Client, config *conf.Config) error {
 	clients, err := getRegisteredClients(client, config)
@@ -40,67 +29,7 @@ func Register(client *http.Client, config *conf.Config) error {
 			return nil
 		}
 	}
-
-	log.Info().Msg("Register client...")
-	cert, err := os.ReadFile(clientCertFile)
-	if err != nil {
-		return err
-	}
-
-	requestData := registerRequest{
-		Type:        "client",
-		ID:          config.BoschConfig.ClientID,
-		Name:        config.BoschConfig.ClientName,
-		PrimaryRole: "ROLE_RESTRICTED_CLIENT",
-		Certificate: string(cert),
-	}
-
-	data, err := json.Marshal(requestData)
-	if err != nil {
-		return err
-	}
-	shcURL := fmt.Sprintf("%s/smarthome/clients", config.BoschConfig.BaseURL)
-	log.Trace().
-		Bytes("body", data).
-		Str("url", shcURL).
-		Msg("Registering client")
-	req, err := http.NewRequestWithContext(
-		context.Background(),
-		http.MethodPost,
-		shcURL,
-		bytes.NewReader(data),
-	)
-	if err != nil {
-		return err
-	}
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		e := resp.Body.Close()
-		if e != nil {
-			log.Err(e).Msg("Error closing response body")
-		}
-	}()
-
-	buf := &bytes.Buffer{}
-	if _, e := buf.ReadFrom(resp.Body); e != nil {
-		return e
-	}
-	body := buf.Bytes()
-	log.Info().
-		Bytes("response", body).
-		Int("status", resp.StatusCode).
-		Msg("Register response")
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("response status of get geive call is not %d, but %d", http.StatusOK, resp.StatusCode)
-	}
-
-	return nil
+	return fmt.Errorf("client is not registered. Please Setup the CLient via the postman collection: https://github.com/BoschSmartHome/bosch-shc-api-docs/tree/master/postman")
 }
 
 type BoschClientResponse struct {
