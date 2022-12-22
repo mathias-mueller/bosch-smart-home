@@ -25,9 +25,11 @@ type Room struct {
 	Name string
 }
 
-var DefaultRoom = &Room{
-	ID:   "",
-	Name: "default",
+func DefaultRoom() *Room {
+	return &Room{
+		ID:   "",
+		Name: "default",
+	}
 }
 
 func GetRooms(client *http.Client, config *conf.Config) <-chan []*Room {
@@ -47,7 +49,7 @@ func pipeSingle(client *http.Client, output chan []*Room, config *conf.Config) {
 	if rooms, err := getSingle(client, config); err != nil {
 		log.Err(err).Msg("Error getting rooms")
 	} else {
-		rooms = append(rooms, DefaultRoom)
+		rooms = append(rooms, DefaultRoom())
 		output <- rooms
 	}
 }

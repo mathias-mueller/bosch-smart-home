@@ -4,6 +4,7 @@ import (
 	"bosch-data-exporter/internal/client"
 	"bosch-data-exporter/internal/conf"
 	"bosch-data-exporter/internal/devices"
+	"bosch-data-exporter/internal/events"
 	"bosch-data-exporter/internal/export"
 	"bosch-data-exporter/internal/polling"
 	"bosch-data-exporter/internal/register"
@@ -36,13 +37,18 @@ func main() {
 
 	roomChan := rooms.GetRooms(httpClient, config)
 
-	deviceChan := devices.GetDevices(httpClient, roomChan, config)
+	devicePolling := devices.NewDevicePolling(httpClient, config)
+
+	deviceChan := devicePolling.GetDevices(roomChan)
 
 	pollID, err := polling.Subscribe(httpClient, config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error getting poll id")
 	}
-	events := polling.Start(httpClient, pollID, deviceChan, config)
 
-	export.Start(events)
+	eventPolling := events.NewSmartHomeEventPolling(httpClient, config)
+
+	eventChan := eventPolling.Start(pollID, deviceChan)
+
+	export.Start(eventChan)
 }

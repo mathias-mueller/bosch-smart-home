@@ -39,64 +39,78 @@ type Device struct {
 	Room        *rooms.Room
 }
 
-var currentRooms []*rooms.Room
-var lock = sync.Mutex{}
-
-var DefaultDevice = &Device{
-	Type:        "default",
-	ID:          "",
-	DeviceModel: "none",
-	Serial:      "",
-	Name:        "default",
-	Profile:     "",
-	Room:        rooms.DefaultRoom,
+type DevicePolling struct {
+	currentRooms []*rooms.Room
+	lock         sync.Mutex
+	client       *http.Client
+	config       *conf.Config
 }
 
-func GetDevices(client *http.Client, roomChan <-chan []*rooms.Room, config *conf.Config) <-chan []*Device {
-	lock.Lock()
-	currentRooms = <-roomChan
-	lock.Unlock()
+func DefaultDevice() *Device {
+	return &Device{
+		Type:        "default",
+		ID:          "",
+		DeviceModel: "none",
+		Serial:      "",
+		Name:        "default",
+		Profile:     "",
+		Room:        rooms.DefaultRoom(),
+	}
+}
+
+func NewDevicePolling(client *http.Client, config *conf.Config) *DevicePolling {
+	return &DevicePolling{
+		lock:   sync.Mutex{},
+		client: client,
+		config: config,
+	}
+}
+
+func (d *DevicePolling) GetDevices(roomChan <-chan []*rooms.Room) <-chan []*Device {
+	d.lock.Lock()
+	d.currentRooms = <-roomChan
+	d.lock.Unlock()
 	go func() {
 		for r := range roomChan {
-			lock.Lock()
-			currentRooms = r
-			lock.Unlock()
+			d.lock.Lock()
+			d.currentRooms = r
+			d.lock.Unlock()
 		}
 	}()
 	output := make(chan []*Device)
-	go pipeSingle(client, output, config)
-	ticker := time.NewTicker(time.Minute * time.Duration(config.DeviceUpdateInterval))
+	go d.pipeSingle(output)
+	ticker := time.NewTicker(time.Minute * time.Duration(d.config.DeviceUpdateInterval))
 	go func() {
 		defer close(output)
 		for range ticker.C {
-			go pipeSingle(client, output, nil)
+			go d.pipeSingle(output)
 		}
 	}()
 	return output
 }
 
-func pipeSingle(client *http.Client, output chan []*Device, config *conf.Config) {
-	if devices, err := getSingle(client, config); err != nil {
+func (d *DevicePolling) pipeSingle(output chan []*Device) {
+	if devices, err := d.getSingle(); err != nil {
 		log.Err(err).Msg("Error getting devices")
 	} else {
-		devices = append(devices, DefaultDevice)
+		devices = append(devices, DefaultDevice())
 		output <- devices
 	}
 }
 
-func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
+func (d *DevicePolling) getSingle() ([]*Device, error) {
 	log.Debug().Msg("Getting devices...")
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
-		fmt.Sprintf("%s/smarthome/devices", config.BoschConfig.BaseURL),
+		fmt.Sprintf("%s/smarthome/devices", d.config.BoschConfig.BaseURL),
 		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := d.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +146,7 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 			Str("roomId", jsonBody[i].RoomID).
 			Str("serial", jsonBody[i].Serial).
 			Msg("Got device")
-		room := getRoom(jsonBody[i].RoomID)
+		room := d.getRoom(jsonBody[i].RoomID)
 		if room == nil {
 			log.Error().
 				Str("roomID", jsonBody[i].RoomID).
@@ -157,10 +171,10 @@ func getSingle(client *http.Client, config *conf.Config) ([]*Device, error) {
 	return devices, nil
 }
 
-func getRoom(id string) *rooms.Room {
-	lock.Lock()
-	defer lock.Unlock()
-	for _, r := range currentRooms {
+func (d *DevicePolling) getRoom(id string) *rooms.Room {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+	for _, r := range d.currentRooms {
 		if r.ID == id {
 			return r
 		}

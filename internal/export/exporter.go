@@ -1,7 +1,7 @@
 package export
 
 import (
-	"bosch-data-exporter/internal/polling"
+	"bosch-data-exporter/internal/events"
 	"net/http"
 	"time"
 
@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Start(events <-chan *polling.Event) {
+func Start(events <-chan *events.Event) {
 	client := influxdb2.NewClientWithOptions(
 		"http://localhost:8086",
 		"adminToken",
