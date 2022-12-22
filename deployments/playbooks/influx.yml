@@ -8,16 +8,16 @@
       apt_repository: repo='deb https://repos.influxdata.com/ubuntu trusty stable' state=present
     - name: Install InfluxDB packages
       apt: name=influxdb state=present
-- name: Start InfluxDB
-  hosts: all
-  become: true
-  tasks:
     - name: Modify InfluxDB hostname
       ansible.builtin.replace:
         dest: /etc/influxdb/influxdb.conf
         regexp: 'hostname = "localhost"'
         replace: 'hostname = "{{ ansible_hostname }}"'
         backup: true
+- name: Start InfluxDB
+  hosts: all
+  become: true
+  tasks:
     - name: Start the InfluxDB service
       ansible.builtin.service:
         name: influxdb
