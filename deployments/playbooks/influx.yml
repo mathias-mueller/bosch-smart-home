@@ -26,6 +26,7 @@
         state: restarted
         enabled: true
 - name: Setup Influx
+  hosts: all
   tasks:
     - name: Create User
       community.general.influxdb_user:
