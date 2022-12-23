@@ -29,7 +29,10 @@ func Register(client *http.Client, config *conf.Config) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("client is not registered. Please Setup the CLient via the postman collection: https://github.com/BoschSmartHome/bosch-shc-api-docs/tree/master/postman")
+	return fmt.Errorf("client is not registered. " +
+		"Please Setup the CLient via the postman collection: " +
+		"https://github.com/BoschSmartHome/bosch-shc-api-docs/tree/master/postman",
+	)
 }
 
 type BoschClientResponse struct {
