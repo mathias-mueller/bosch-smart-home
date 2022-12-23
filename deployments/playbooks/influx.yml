@@ -3,11 +3,17 @@
   become: true
   tasks:
     - name: Import InfluxDB GPG signing key
-      apt_key: url=https://repos.influxdata.com/influxdb.key state=present
+      apt_key:
+        url: https://repos.influxdata.com/influxdb.key
+        state: present
     - name: Add InfluxDB repository
-      apt_repository: repo='deb https://repos.influxdata.com/ubuntu trusty stable' state=present
+      apt_repository:
+       repo: 'deb https://repos.influxdata.com/ubuntu trusty stable'
+       state: present
     - name: Install InfluxDB packages
-      apt: name=influxdb state=present
+      apt:
+        name: influxdb2
+        state: present
     - name: Modify InfluxDB hostname
       ansible.builtin.replace:
         dest: /etc/influxdb/influxdb.conf
