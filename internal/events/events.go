@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
 
@@ -46,11 +48,13 @@ type Event struct {
 }
 
 type SmartHomeEventPolling struct {
-	currentDevices []*devices.Device
-	pollID         string
-	lock           sync.Mutex
-	client         *http.Client
-	config         *conf.Config
+	currentDevices  []*devices.Device
+	pollID          string
+	lock            sync.Mutex
+	client          *http.Client
+	config          *conf.Config
+	reqDurationHist prometheus.Histogram
+	eventCountHist  prometheus.Histogram
 }
 
 func NewSmartHomeEventPolling(client *http.Client, config *conf.Config) *SmartHomeEventPolling {
@@ -58,6 +62,14 @@ func NewSmartHomeEventPolling(client *http.Client, config *conf.Config) *SmartHo
 		lock:   sync.Mutex{},
 		client: client,
 		config: config,
+		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name: "bosch_event_poll_duration",
+			Help: "Duration of the GET Events long poll call",
+		}),
+		eventCountHist: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name: "bosch_event_count",
+			Help: "Number of events returned by a long poll",
+		}),
 	}
 }
 
@@ -90,6 +102,7 @@ func (s *SmartHomeEventPolling) Start(
 		for err == nil {
 			var events []*Event
 			events, err = s.Get()
+			s.eventCountHist.Observe(float64(len(events)))
 			go func() {
 				for _, e := range events {
 					if e != nil {
@@ -104,6 +117,8 @@ func (s *SmartHomeEventPolling) Start(
 }
 
 func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
+	timer := prometheus.NewTimer(s.reqDurationHist)
+	defer timer.ObserveDuration()
 	pollID := s.pollID
 	log.Info().
 		Str("pollID", pollID).

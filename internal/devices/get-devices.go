@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
 
@@ -40,10 +42,11 @@ type Device struct {
 }
 
 type DevicePolling struct {
-	currentRooms []*rooms.Room
-	lock         sync.Mutex
-	client       *http.Client
-	config       *conf.Config
+	currentRooms    []*rooms.Room
+	lock            sync.Mutex
+	client          *http.Client
+	config          *conf.Config
+	reqDurationHist prometheus.Histogram
 }
 
 func DefaultDevice() *Device {
@@ -63,6 +66,10 @@ func NewDevicePolling(client *http.Client, config *conf.Config) *DevicePolling {
 		lock:   sync.Mutex{},
 		client: client,
 		config: config,
+		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name: "bosch_device_poll_duration",
+			Help: "Duration of the GET Device call",
+		}),
 	}
 }
 
@@ -90,12 +97,15 @@ func (d *DevicePolling) GetDevices(roomChan <-chan []*rooms.Room) <-chan []*Devi
 }
 
 func (d *DevicePolling) pipeSingle(output chan []*Device) {
-	if devices, err := d.getSingle(); err != nil {
+	timer := prometheus.NewTimer(d.reqDurationHist)
+	defer timer.ObserveDuration()
+	devices, err := d.getSingle()
+	if err != nil {
 		log.Err(err).Msg("Error getting devices")
-	} else {
-		devices = append(devices, DefaultDevice())
-		output <- devices
+		return
 	}
+	devices = append(devices, DefaultDevice())
+	output <- devices
 }
 
 func (d *DevicePolling) getSingle() ([]*Device, error) {

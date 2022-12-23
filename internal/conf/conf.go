@@ -12,6 +12,7 @@ type Config struct {
 	PollIDUpdateInterval int
 	ClientCertPath       string
 	ClientKeyPath        string
+	Port                 int
 	InfluxConfig         *InfluxConfig
 	BoschConfig          *BoschConfig
 }

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,41 +34,61 @@ func DefaultRoom() *Room {
 	}
 }
 
-func GetRooms(client *http.Client, config *conf.Config) <-chan []*Room {
+type RoomPolling struct {
+	client          *http.Client
+	config          *conf.Config
+	reqDurationHist prometheus.Histogram
+}
+
+func NewRoomPolling(client *http.Client, config *conf.Config) *RoomPolling {
+	return &RoomPolling{
+		client: client,
+		config: config,
+		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
+			Name: "bosch_room_poll_duration",
+			Help: "Duration of the GET Room call",
+		}),
+	}
+}
+
+func (r *RoomPolling) GetRooms() <-chan []*Room {
 	output := make(chan []*Room)
-	go pipeSingle(client, output, config)
-	ticker := time.NewTicker(time.Minute * time.Duration(config.DeviceUpdateInterval))
+	go r.pipeSingle(output)
+	ticker := time.NewTicker(time.Minute * time.Duration(r.config.DeviceUpdateInterval))
 	go func() {
 		defer close(output)
 		for range ticker.C {
-			go pipeSingle(client, output, nil)
+			go r.pipeSingle(output)
 		}
 	}()
 	return output
 }
 
-func pipeSingle(client *http.Client, output chan []*Room, config *conf.Config) {
-	if rooms, err := getSingle(client, config); err != nil {
+func (r *RoomPolling) pipeSingle(output chan []*Room) {
+	timer := prometheus.NewTimer(r.reqDurationHist)
+	defer timer.ObserveDuration()
+	rooms, err := r.getSingle()
+	if err != nil {
 		log.Err(err).Msg("Error getting rooms")
-	} else {
-		rooms = append(rooms, DefaultRoom())
-		output <- rooms
+		return
 	}
+	rooms = append(rooms, DefaultRoom())
+	output <- rooms
 }
 
-func getSingle(client *http.Client, config *conf.Config) ([]*Room, error) {
+func (r *RoomPolling) getSingle() ([]*Room, error) {
 	log.Debug().Msg("Getting rooms...")
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
-		fmt.Sprintf("%s/smarthome/rooms", config.BoschConfig.BaseURL),
+		fmt.Sprintf("%s/smarthome/rooms", r.config.BoschConfig.BaseURL),
 		nil,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
