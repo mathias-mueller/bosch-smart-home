@@ -13,6 +13,7 @@ type Config struct {
 	ClientCertPath       string
 	ClientKeyPath        string
 	Port                 int
+	LogLevel             string
 	InfluxConfig         *InfluxConfig
 	BoschConfig          *BoschConfig
 }

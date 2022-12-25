@@ -31,6 +31,13 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error loading config")
 	}
+	logLevel, err := zerolog.ParseLevel(config.LogLevel)
+	if err != nil {
+		log.Fatal().Err(err).
+			Str("level", config.LogLevel).
+			Msg("Failed to parse log level")
+	}
+	zerolog.SetGlobalLevel(logLevel)
 
 	httpClient := client.Init(config)
 
