@@ -120,7 +120,7 @@ func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 	timer := prometheus.NewTimer(s.reqDurationHist)
 	defer timer.ObserveDuration()
 	pollID := s.pollID
-	log.Info().
+	log.Debug().
 		Str("pollID", pollID).
 		Msg("Polling for changes")
 	requestBody := []pollRequest{
@@ -184,7 +184,7 @@ func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 
 	for i := range shcBody.Result {
 		event := &shcBody.Result[i]
-		log.Info().
+		log.Debug().
 			Str("deviceID", event.DeviceID).
 			Str("id", event.ID).
 			Str("path", event.Path).

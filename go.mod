@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/influxdata/influxdb-client-go/v2 v2.12.1
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/rs/zerolog v1.28.0
 )

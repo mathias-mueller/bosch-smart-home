@@ -1,4 +1,5 @@
 {
+  "LogLevel": "trace",
   "Port": 8080,
   "DeviceUpdateInterval": 10,
   "PollIDUpdateInterval": 30,

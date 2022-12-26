@@ -148,7 +148,7 @@ func (d *DevicePolling) getSingle() ([]*Device, error) {
 	devices := make([]*Device, 0)
 
 	for i := range jsonBody {
-		log.Info().
+		log.Debug().
 			Str("id", jsonBody[i].ID).
 			Str("name", jsonBody[i].Name).
 			Str("type", jsonBody[i].Type).
@@ -178,6 +178,7 @@ func (d *DevicePolling) getSingle() ([]*Device, error) {
 			},
 		)
 	}
+	log.Info().Int("number", len(devices)).Msg("Got devices")
 	return devices, nil
 }
 

@@ -25,7 +25,7 @@ func main() {
 			Out: os.Stdout,
 		},
 	)
-	zerolog.SetGlobalLevel(zerolog.TraceLevel)
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	config, err := conf.LoadConfig()
 	if err != nil {
@@ -63,7 +63,12 @@ func main() {
 
 	eventChan := eventPolling.Start(pollID, deviceChan)
 
-	go export.Start(eventChan)
+	exporter, err := export.NewInfluxExporter(config)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Could not connect influx client")
+	}
+
+	go exporter.Start(eventChan)
 
 	handler := http.NewServeMux()
 	handler.Handle("/metrics", promhttp.Handler())

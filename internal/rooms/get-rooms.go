@@ -114,7 +114,7 @@ func (r *RoomPolling) getSingle() ([]*Room, error) {
 	}
 	rooms := make([]*Room, 0)
 	for i := range jsonBody {
-		log.Info().
+		log.Debug().
 			Str("id", jsonBody[i].ID).
 			Str("name", jsonBody[i].Name).
 			Msg("Got room")
@@ -125,6 +125,6 @@ func (r *RoomPolling) getSingle() ([]*Room, error) {
 			},
 		)
 	}
-
+	log.Info().Int("number", len(rooms)).Msg("Got rooms")
 	return rooms, nil
 }
