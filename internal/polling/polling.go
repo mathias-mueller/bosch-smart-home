@@ -7,10 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+type httpClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
 
 type pollRequest struct {
 	Jsonrpc string        `json:"jsonrpc"`
@@ -23,28 +26,19 @@ type pollSubscribeResponse struct {
 	Jsonrpc string `json:"jsonrpc"`
 }
 
-func Subscribe(client *http.Client, config *conf.Config) (<-chan string, error) {
-	output := make(chan string, 1)
-	pollID, err := getSinglePollID(client, config)
-	if err != nil {
-		return nil, err
-	}
-	output <- pollID
-	ticker := time.NewTicker(time.Minute * time.Duration(config.PollIDUpdateInterval))
-	go func() {
-		defer close(output)
-		for range ticker.C {
-			pollID2, e := getSinglePollID(client, config)
-			if err != nil {
-				log.Err(e).Msg("Error getting polling id")
-			}
-			output <- pollID2
-		}
-	}()
-	return output, nil
+type PollIDGenerator struct {
+	client  httpClient
+	baseURL string
 }
 
-func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
+func New(client httpClient, config *conf.Config) *PollIDGenerator {
+	return &PollIDGenerator{
+		client:  client,
+		baseURL: config.BoschConfig.BaseURL,
+	}
+}
+
+func (p *PollIDGenerator) Get() (string, error) {
 	requestBody := []pollRequest{
 		{
 			Jsonrpc: "2.0",
@@ -56,7 +50,7 @@ func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", config.BoschConfig.BaseURL)
+	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", p.baseURL)
 	log.Info().
 		Str("url", shcPollURL).
 		Bytes("body", requestBodyBytes).
@@ -72,7 +66,7 @@ func getSinglePollID(client *http.Client, config *conf.Config) (string, error) {
 		return "", err
 	}
 
-	resp, err := client.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return "", err
 	}

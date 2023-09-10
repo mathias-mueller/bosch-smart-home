@@ -8,13 +8,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
+
+type httpClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+type currentRooms interface {
+	Get() []*rooms.Room
+}
 
 type DeviceResponse struct {
 	Type             string   `json:"@type"`
@@ -42,10 +48,10 @@ type Device struct {
 }
 
 type DevicePolling struct {
-	currentRooms    []*rooms.Room
-	lock            sync.Mutex
-	client          *http.Client
-	config          *conf.Config
+	rooms           currentRooms
+	client          httpClient
+	updateInterval  int
+	baseURL         string
 	reqDurationHist prometheus.Histogram
 }
 
@@ -61,11 +67,12 @@ func DefaultDevice() *Device {
 	}
 }
 
-func NewDevicePolling(client *http.Client, config *conf.Config) *DevicePolling {
+func NewDevicePolling(client httpClient, currentRooms currentRooms, config *conf.Config) *DevicePolling {
 	return &DevicePolling{
-		lock:   sync.Mutex{},
-		client: client,
-		config: config,
+		rooms:          currentRooms,
+		client:         client,
+		baseURL:        config.BoschConfig.BaseURL,
+		updateInterval: config.DeviceUpdateInterval,
 		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name: "bosch_device_poll_duration",
 			Help: "Duration of the GET Device call",
@@ -73,47 +80,12 @@ func NewDevicePolling(client *http.Client, config *conf.Config) *DevicePolling {
 	}
 }
 
-func (d *DevicePolling) GetDevices(roomChan <-chan []*rooms.Room) <-chan []*Device {
-	d.lock.Lock()
-	d.currentRooms = <-roomChan
-	d.lock.Unlock()
-	go func() {
-		for r := range roomChan {
-			d.lock.Lock()
-			d.currentRooms = r
-			d.lock.Unlock()
-		}
-	}()
-	output := make(chan []*Device)
-	go d.pipeSingle(output)
-	ticker := time.NewTicker(time.Minute * time.Duration(d.config.DeviceUpdateInterval))
-	go func() {
-		defer close(output)
-		for range ticker.C {
-			go d.pipeSingle(output)
-		}
-	}()
-	return output
-}
-
-func (d *DevicePolling) pipeSingle(output chan []*Device) {
-	timer := prometheus.NewTimer(d.reqDurationHist)
-	defer timer.ObserveDuration()
-	devices, err := d.getSingle()
-	if err != nil {
-		log.Err(err).Msg("Error getting devices")
-		return
-	}
-	devices = append(devices, DefaultDevice())
-	output <- devices
-}
-
-func (d *DevicePolling) getSingle() ([]*Device, error) {
+func (d *DevicePolling) Get() ([]*Device, error) {
 	log.Debug().Msg("Getting devices...")
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodGet,
-		fmt.Sprintf("%s/smarthome/devices", d.config.BoschConfig.BaseURL),
+		fmt.Sprintf("%s/smarthome/devices", d.baseURL),
 		nil,
 	)
 	if err != nil {
@@ -183,9 +155,7 @@ func (d *DevicePolling) getSingle() ([]*Device, error) {
 }
 
 func (d *DevicePolling) getRoom(id string) *rooms.Room {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-	for _, r := range d.currentRooms {
+	for _, r := range d.rooms.Get() {
 		if r.ID == id {
 			return r
 		}

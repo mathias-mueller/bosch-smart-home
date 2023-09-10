@@ -8,12 +8,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
+
+type httpClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+type devicePolling interface {
+	Get() []*devices.Device
+}
+
+type pollID interface {
+	Get() string
+}
 
 type pollRequest struct {
 	Jsonrpc string        `json:"jsonrpc"`
@@ -48,20 +59,20 @@ type Event struct {
 }
 
 type SmartHomeEventPolling struct {
-	currentDevices  []*devices.Device
-	pollID          string
-	lock            sync.Mutex
-	client          *http.Client
+	devices         devicePolling
+	pollID          pollID
+	client          httpClient
 	config          *conf.Config
 	reqDurationHist prometheus.Histogram
 	eventCountHist  prometheus.Histogram
 }
 
-func NewSmartHomeEventPolling(client *http.Client, config *conf.Config) *SmartHomeEventPolling {
+func NewSmartHomeEventPolling(client httpClient, devicePolling devicePolling, pollID pollID, config *conf.Config) *SmartHomeEventPolling {
 	return &SmartHomeEventPolling{
-		lock:   sync.Mutex{},
-		client: client,
-		config: config,
+		client:  client,
+		devices: devicePolling,
+		pollID:  pollID,
+		config:  config,
 		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name: "bosch_event_poll_duration",
 			Help: "Duration of the GET Events long poll call",
@@ -73,28 +84,7 @@ func NewSmartHomeEventPolling(client *http.Client, config *conf.Config) *SmartHo
 	}
 }
 
-func (s *SmartHomeEventPolling) Start(
-	pollIDchan <-chan string,
-	deviceChan <-chan []*devices.Device,
-) <-chan *Event {
-	s.lock.Lock()
-	s.currentDevices = <-deviceChan
-	s.pollID = <-pollIDchan
-	s.lock.Unlock()
-	go func() {
-		for d := range deviceChan {
-			s.lock.Lock()
-			s.currentDevices = d
-			s.lock.Unlock()
-		}
-	}()
-	go func() {
-		for id := range pollIDchan {
-			s.lock.Lock()
-			s.pollID = id
-			s.lock.Unlock()
-		}
-	}()
+func (s *SmartHomeEventPolling) Start() <-chan *Event {
 	output := make(chan *Event)
 	go func() {
 		defer close(output)
@@ -119,7 +109,7 @@ func (s *SmartHomeEventPolling) Start(
 func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 	timer := prometheus.NewTimer(s.reqDurationHist)
 	defer timer.ObserveDuration()
-	pollID := s.pollID
+	pollID := s.pollID.Get()
 	log.Debug().
 		Str("pollID", pollID).
 		Msg("Polling for changes")
@@ -210,9 +200,7 @@ func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 }
 
 func (s *SmartHomeEventPolling) getDevice(id string) *devices.Device {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for _, d := range s.currentDevices {
+	for _, d := range s.devices.Get() {
 		if d.ID == id {
 			return d
 		}
