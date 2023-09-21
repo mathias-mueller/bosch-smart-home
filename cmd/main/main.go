@@ -56,16 +56,14 @@ func main() {
 	pollID := polling.New(httpClient, config)
 	cachedPollID := cache.New(pollID.Get, time.Minute*time.Duration(config.PollIDUpdateInterval))
 
-	eventPolling := events.NewSmartHomeEventPolling(httpClient, cachedDevices, cachedPollID, config)
-
-	eventChan := eventPolling.Start()
-
 	exporter, err := export.NewInfluxExporter(config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not connect influx client")
 	}
 
-	go exporter.Start(eventChan)
+	eventPolling := events.NewSmartHomeEventPolling(httpClient, cachedDevices, cachedPollID, exporter, config)
+
+	go eventPolling.Start()
 
 	handler := http.NewServeMux()
 	handler.Handle("/metrics", promhttp.Handler())

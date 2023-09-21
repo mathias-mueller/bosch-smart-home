@@ -26,6 +26,10 @@ type pollID interface {
 	Get() string
 }
 
+type exporter interface {
+	Export(event *Event)
+}
+
 type pollRequest struct {
 	Jsonrpc string        `json:"jsonrpc"`
 	Method  string        `json:"method"`
@@ -62,17 +66,25 @@ type SmartHomeEventPolling struct {
 	devices         devicePolling
 	pollID          pollID
 	client          httpClient
-	config          *conf.Config
+	exporter        exporter
+	baseURL         string
 	reqDurationHist prometheus.Histogram
 	eventCountHist  prometheus.Histogram
 }
 
-func NewSmartHomeEventPolling(client httpClient, devicePolling devicePolling, pollID pollID, config *conf.Config) *SmartHomeEventPolling {
+func NewSmartHomeEventPolling(
+	client httpClient,
+	devicePolling devicePolling,
+	pollID pollID,
+	exporter exporter,
+	config *conf.Config,
+) *SmartHomeEventPolling {
 	return &SmartHomeEventPolling{
-		client:  client,
-		devices: devicePolling,
-		pollID:  pollID,
-		config:  config,
+		client:   client,
+		devices:  devicePolling,
+		pollID:   pollID,
+		exporter: exporter,
+		baseURL:  config.BoschConfig.BaseURL,
 		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name: "bosch_event_poll_duration",
 			Help: "Duration of the GET Events long poll call",
@@ -84,26 +96,19 @@ func NewSmartHomeEventPolling(client httpClient, devicePolling devicePolling, po
 	}
 }
 
-func (s *SmartHomeEventPolling) Start() <-chan *Event {
-	output := make(chan *Event)
-	go func() {
-		defer close(output)
-		var err error
-		for err == nil {
-			var events []*Event
-			events, err = s.Get()
-			s.eventCountHist.Observe(float64(len(events)))
-			go func() {
-				for _, e := range events {
-					if e != nil {
-						output <- e
-					}
-				}
-			}()
+func (s *SmartHomeEventPolling) Start() {
+	var err error
+	for err == nil {
+		var events []*Event
+		events, err = s.Get()
+		s.eventCountHist.Observe(float64(len(events)))
+		for _, e := range events {
+			if e != nil {
+				go s.exporter.Export(e)
+			}
 		}
-		log.Err(err).Msg("Error while polling data")
-	}()
-	return output
+	}
+	log.Err(err).Msg("Error while polling data")
 }
 
 func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
@@ -124,7 +129,7 @@ func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", s.config.BoschConfig.BaseURL)
+	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", s.baseURL)
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
