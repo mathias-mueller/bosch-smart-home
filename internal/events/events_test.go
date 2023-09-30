@@ -33,13 +33,19 @@ func (m *mockClient) Do(request *http.Request) (*http.Response, error) {
 }
 
 type mockExporter struct {
+	mockExport func(*Event)
+}
+
+func (m mockExporter) Export(event *Event) {
+	m.mockExport(event)
 }
 
 func TestSmartHomeEventPolling_Get(t *testing.T) {
 	type fields struct {
-		devices []*devices.Device
-		pollID  string
-		client  httpClient
+		devices  []*devices.Device
+		pollID   string
+		client   httpClient
+		exporter exporter
 	}
 	tests := []struct {
 		name    string
@@ -57,6 +63,7 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 						return nil, errors.New("test")
 					},
 				},
+				exporter: &mockExporter{},
 			},
 			want:    nil,
 			wantErr: true,
@@ -65,10 +72,11 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &SmartHomeEventPolling{
-				devices: &mockDevices{func() []*devices.Device { return tt.fields.devices }},
-				pollID:  &mockPollID{func() string { return tt.fields.pollID }},
-				client:  tt.fields.client,
-				baseURL: "http://localhost:8080",
+				devices:  &mockDevices{func() []*devices.Device { return tt.fields.devices }},
+				pollID:   &mockPollID{func() string { return tt.fields.pollID }},
+				client:   tt.fields.client,
+				baseURL:  "http://localhost:8080",
+				exporter: tt.fields.exporter,
 			}
 			got, err := s.Get()
 			if (err != nil) != tt.wantErr {

@@ -37,7 +37,8 @@ func TestPollIDGenerator_Get(t *testing.T) {
 						assert.Equal(t, "http://localhost:8080/remote/json-rpc", request.URL.String())
 						assert.Equal(t, http.MethodPost, request.Method)
 						buf := new(strings.Builder)
-						io.Copy(buf, request.Body)
+						_, e := io.Copy(buf, request.Body)
+						assert.NoError(t, e)
 						request.Body.Close()
 						assert.JSONEq(t, "[{"+
 							"\"jsonrpc\":\"2.0\","+
