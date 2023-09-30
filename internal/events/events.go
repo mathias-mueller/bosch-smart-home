@@ -8,12 +8,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog/log"
 )
+
+type httpClient interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+type devicePolling interface {
+	Get() []*devices.Device
+}
+
+type pollID interface {
+	Get() string
+}
+
+type exporter interface {
+	Export(event *Event)
+}
 
 type pollRequest struct {
 	Jsonrpc string        `json:"jsonrpc"`
@@ -48,20 +63,28 @@ type Event struct {
 }
 
 type SmartHomeEventPolling struct {
-	currentDevices  []*devices.Device
-	pollID          string
-	lock            sync.Mutex
-	client          *http.Client
-	config          *conf.Config
+	devices         devicePolling
+	pollID          pollID
+	client          httpClient
+	exporter        exporter
+	baseURL         string
 	reqDurationHist prometheus.Histogram
 	eventCountHist  prometheus.Histogram
 }
 
-func NewSmartHomeEventPolling(client *http.Client, config *conf.Config) *SmartHomeEventPolling {
+func NewSmartHomeEventPolling(
+	client httpClient,
+	devicePolling devicePolling,
+	pollID pollID,
+	exporter exporter,
+	config *conf.Config,
+) *SmartHomeEventPolling {
 	return &SmartHomeEventPolling{
-		lock:   sync.Mutex{},
-		client: client,
-		config: config,
+		client:   client,
+		devices:  devicePolling,
+		pollID:   pollID,
+		exporter: exporter,
+		baseURL:  config.BoschConfig.BaseURL,
 		reqDurationHist: promauto.NewHistogram(prometheus.HistogramOpts{
 			Name: "bosch_event_poll_duration",
 			Help: "Duration of the GET Events long poll call",
@@ -73,53 +96,25 @@ func NewSmartHomeEventPolling(client *http.Client, config *conf.Config) *SmartHo
 	}
 }
 
-func (s *SmartHomeEventPolling) Start(
-	pollIDchan <-chan string,
-	deviceChan <-chan []*devices.Device,
-) <-chan *Event {
-	s.lock.Lock()
-	s.currentDevices = <-deviceChan
-	s.pollID = <-pollIDchan
-	s.lock.Unlock()
-	go func() {
-		for d := range deviceChan {
-			s.lock.Lock()
-			s.currentDevices = d
-			s.lock.Unlock()
+func (s *SmartHomeEventPolling) Start() {
+	var err error
+	for err == nil {
+		var events []*Event
+		events, err = s.Get()
+		s.eventCountHist.Observe(float64(len(events)))
+		for _, e := range events {
+			if e != nil {
+				go s.exporter.Export(e)
+			}
 		}
-	}()
-	go func() {
-		for id := range pollIDchan {
-			s.lock.Lock()
-			s.pollID = id
-			s.lock.Unlock()
-		}
-	}()
-	output := make(chan *Event)
-	go func() {
-		defer close(output)
-		var err error
-		for err == nil {
-			var events []*Event
-			events, err = s.Get()
-			s.eventCountHist.Observe(float64(len(events)))
-			go func() {
-				for _, e := range events {
-					if e != nil {
-						output <- e
-					}
-				}
-			}()
-		}
-		log.Err(err).Msg("Error while polling data")
-	}()
-	return output
+	}
+	log.Err(err).Msg("Error while polling data")
 }
 
 func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 	timer := prometheus.NewTimer(s.reqDurationHist)
 	defer timer.ObserveDuration()
-	pollID := s.pollID
+	pollID := s.pollID.Get()
 	log.Debug().
 		Str("pollID", pollID).
 		Msg("Polling for changes")
@@ -134,7 +129,7 @@ func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 	if err != nil {
 		return nil, err
 	}
-	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", s.config.BoschConfig.BaseURL)
+	shcPollURL := fmt.Sprintf("%s/remote/json-rpc", s.baseURL)
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		http.MethodPost,
@@ -210,9 +205,7 @@ func (s *SmartHomeEventPolling) Get() ([]*Event, error) {
 }
 
 func (s *SmartHomeEventPolling) getDevice(id string) *devices.Device {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-	for _, d := range s.currentDevices {
+	for _, d := range s.devices.Get() {
 		if d.ID == id {
 			return d
 		}

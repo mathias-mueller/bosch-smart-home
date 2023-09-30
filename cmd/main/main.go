@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bosch-data-exporter/internal/cache"
 	"bosch-data-exporter/internal/client"
 	"bosch-data-exporter/internal/conf"
 	"bosch-data-exporter/internal/devices"
@@ -47,28 +48,22 @@ func main() {
 	}
 
 	roomPolling := rooms.NewRoomPolling(httpClient, config)
+	cachedRooms := cache.New(roomPolling.Get, time.Duration(config.DeviceUpdateInterval)*time.Minute)
 
-	roomChan := roomPolling.GetRooms()
+	devicePolling := devices.NewDevicePolling(httpClient, cachedRooms, config)
+	cachedDevices := cache.New(devicePolling.Get, time.Duration(config.DeviceUpdateInterval)*time.Minute)
 
-	devicePolling := devices.NewDevicePolling(httpClient, config)
-
-	deviceChan := devicePolling.GetDevices(roomChan)
-
-	pollID, err := polling.Subscribe(httpClient, config)
-	if err != nil {
-		log.Fatal().Err(err).Msg("error getting poll id")
-	}
-
-	eventPolling := events.NewSmartHomeEventPolling(httpClient, config)
-
-	eventChan := eventPolling.Start(pollID, deviceChan)
+	pollID := polling.New(httpClient, config)
+	cachedPollID := cache.New(pollID.Get, time.Minute*time.Duration(config.PollIDUpdateInterval))
 
 	exporter, err := export.NewInfluxExporter(config)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Could not connect influx client")
 	}
 
-	go exporter.Start(eventChan)
+	eventPolling := events.NewSmartHomeEventPolling(httpClient, cachedDevices, cachedPollID, exporter, config)
+
+	go eventPolling.Start()
 
 	handler := http.NewServeMux()
 	handler.Handle("/metrics", promhttp.Handler())

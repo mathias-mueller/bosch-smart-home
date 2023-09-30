@@ -52,17 +52,21 @@ func NewInfluxExporter(config *conf.Config) (*InfluxExporter, error) {
 	}, nil
 }
 
+func (e *InfluxExporter) Export(event *events.Event) {
+	log.Debug().
+		Str("type", event.Type).
+		Interface("state", event.State).
+		Str("device", event.Device.Name).
+		Str("room", event.Device.Room.Name).
+		Str("id", event.ID).
+		Msg("Got Event")
+	e.exportRaw(event)
+	e.parseAndExport(event)
+}
+
 func (e *InfluxExporter) Start(events <-chan *events.Event) {
 	for event := range events {
-		log.Debug().
-			Str("type", event.Type).
-			Interface("state", event.State).
-			Str("device", event.Device.Name).
-			Str("room", event.Device.Room.Name).
-			Str("id", event.ID).
-			Msg("Got Event")
-		e.exportRaw(event)
-		e.parseAndExport(event)
+		e.Export(event)
 	}
 }
 
