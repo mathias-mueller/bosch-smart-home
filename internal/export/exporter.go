@@ -9,15 +9,17 @@ import (
 	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
-	"github.com/influxdata/influxdb-client-go/v2/api"
 	influxHttp "github.com/influxdata/influxdb-client-go/v2/api/http"
+	"github.com/influxdata/influxdb-client-go/v2/api/write"
 	"github.com/rs/zerolog/log"
 )
 
+type writeAPI interface {
+	WritePoint(point *write.Point)
+}
+
 type InfluxExporter struct {
-	client   influxdb2.Client
-	writeAPI api.WriteAPI
-	config   *conf.Config
+	writeAPI writeAPI
 }
 
 func NewInfluxExporter(config *conf.Config) (*InfluxExporter, error) {
@@ -26,8 +28,8 @@ func NewInfluxExporter(config *conf.Config) (*InfluxExporter, error) {
 		config.InfluxConfig.AuthToken,
 		influxdb2.DefaultOptions(),
 	)
-	writeAPI := client.WriteAPI(config.InfluxConfig.Org, config.InfluxConfig.Bucket)
-	writeAPI.SetWriteFailedCallback(func(batch string, err influxHttp.Error, retryAttempts uint) bool {
+	wAPI := client.WriteAPI(config.InfluxConfig.Org, config.InfluxConfig.Bucket)
+	wAPI.SetWriteFailedCallback(func(batch string, err influxHttp.Error, retryAttempts uint) bool {
 		log.Err(err.Err).
 			Str("batch", batch).
 			Uint("retryAttempts", retryAttempts).
@@ -46,9 +48,7 @@ func NewInfluxExporter(config *conf.Config) (*InfluxExporter, error) {
 	}
 
 	return &InfluxExporter{
-		client:   client,
-		writeAPI: writeAPI,
-		config:   config,
+		writeAPI: wAPI,
 	}, nil
 }
 
@@ -62,12 +62,6 @@ func (e *InfluxExporter) Export(event *events.Event) {
 		Msg("Got Event")
 	e.exportRaw(event)
 	e.parseAndExport(event)
-}
-
-func (e *InfluxExporter) Start(events <-chan *events.Event) {
-	for event := range events {
-		e.Export(event)
-	}
 }
 
 func (e *InfluxExporter) exportRaw(event *events.Event) {
