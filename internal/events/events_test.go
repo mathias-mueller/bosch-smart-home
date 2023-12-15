@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -47,7 +46,7 @@ func (m mockExporter) Export(event *Event) {
 func TestSmartHomeEventPolling_Get(t *testing.T) {
 	dev0 := &devices.Device{
 		Type: "roomClimateControl",
-		ID:   "rootClimateControl_hz_5",
+		ID:   "roomClimateControl_hz_5",
 		Name: "roomClimateControl",
 		Room: nil,
 	}
@@ -61,7 +60,7 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 		name    string
 		fields  fields
 		want    []*Event
-		wantErr bool
+		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name: "error",
@@ -80,7 +79,7 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 				},
 			},
 			want:    nil,
-			wantErr: true,
+			wantErr: assert.Error,
 		},
 		{
 			name: "no results",
@@ -102,7 +101,7 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 				},
 			},
 			want:    make([]*Event, 0),
-			wantErr: false,
+			wantErr: assert.NoError,
 		},
 		{
 			name: "results",
@@ -137,10 +136,10 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 					ID:     "TemperatureLevel",
 					Type:   "DeviceServiceData",
 					Device: dev0,
-					State:  map[string]interface{}{"@type": "temperatureLevelState", "temperature": 25},
+					State:  map[string]interface{}{"@type": "temperatureLevelState", "temperature": float64(25)},
 				},
 			},
-			wantErr: false,
+			wantErr: assert.NoError,
 		},
 	}
 	for _, tt := range tests {
@@ -153,13 +152,8 @@ func TestSmartHomeEventPolling_Get(t *testing.T) {
 				exporter: tt.fields.exporter,
 			}
 			got, err := s.Get()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Get() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Get() got = %v, want %v", got, tt.want)
-			}
+			tt.wantErr(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
