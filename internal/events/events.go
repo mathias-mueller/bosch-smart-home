@@ -104,7 +104,7 @@ func (s *SmartHomeEventPolling) Start() {
 		s.eventCountHist.Observe(float64(len(events)))
 		for _, e := range events {
 			if e != nil {
-				go s.exporter.Export(e)
+				s.exporter.Export(e)
 			}
 		}
 	}
